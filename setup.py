@@ -3,7 +3,7 @@ from __future__ import print_function
 from setuptools import setup
 
 setup(
-    name='ntypes',
+    name='nim-types',
     version='0.0.1',
     description='ctypes interoperability with the Nim language',
     url='https://github.com/subsetpark/ntypes',

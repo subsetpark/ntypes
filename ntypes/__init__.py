@@ -18,82 +18,92 @@ class Object(Structure):
     pass
 
 
-class OpenArray(object):
+class OpenArrayBase(list):
     """
     A constructor for openArray arguments to Nim procedures. Realized within
     Nim as a pointer to the beginning of an array, followed by the array's
     length as an integer.
     """
 
-    def __init__(self, element_type, array_length=None, elements=None):
-        if array_length is None and elements is None:
-            raise ValueError("array_length or elements is required.")
+    def __init__(self, elements=list()):
+        if elements:
+            self.extend(elements)
 
-        self.array_length = array_length or len(elements)
-        self.element_type = element_type
-        self.array_type = self.element_type * self.array_length
-        self.array = self.array_type()
+    def array(self):
+        array_type = self.element_type * len(self)
+        array = array_type()
 
-        if elements is not None:
-            self.populate(elements)
+        for i, element in enumerate(self):
+            array[i] = element
 
-    def __setitem__(self, idx, item):
-        return self.array.__setitem__(idx, item)
-
-    def __getitem__(self, idx):
-        return self.array.__getitem__(idx)
-
-    def __len__(self):
-        return self.array.__len__()
-
-    def __iter__(self):
-        return iter(self.array)
-
-    def populate(self, elements):
-        for i, element in enumerate(elements):
-            self.array[i] = element
+        return array
 
 
-class NimArgTypes(object):
+def OpenArray(element_type):
+    """
+    Declare an OpenArray type.
+
+    >>> import ctypes
+    >>> int_open_array_class = OpenArray(ctypes.c_int)
+    >>> print(int_open_array_class.__name__)
+    c_intOpenArray
+    >>> int_open_array = int_open_array_class()
+    >>> int_open_array.append(1)
+    >>> int_open_array.append(2)
+    >>> print(int_open_array[0])
+    1
+    >>> array = int_open_array.array()
+    >>> print(len(array))
+    2
+    """
+
+    return type("{}OpenArray".format(element_type.__name__), (OpenArrayBase, ),
+                {"element_type": element_type})
+
+
+class NimArgTypes(list):
     """
     Constructor for an argument type list for a Nim procedure.
+
+    >>> import ctypes
+    >>> arg_types = NimArgTypes()
+    >>> arg_types.add_type(ctypes.c_int)
+    >>> print(len(arg_types))
+    1
+    >>> print(arg_types[0].__name__)
+    LP_c_int
+    >>> arg_types.add_open_array(ctypes.c_int)
+    >>> print(len(arg_types))
+    3
+    >>> int_open_array_class = OpenArray(ctypes.c_int)
+    >>> int_open_array = int_open_array_class()
+    >>> arg_types.add_open_array(int_open_array)
+    >>> print(len(arg_types))
+    5
     """
 
-    def __init__(self):
-        self.arg_types = []
-
     def add_open_array(self, element_type):
-        if isinstance(element_type, OpenArray):
-            self.arg_types.extend(
-                [POINTER(element_type.object_type), ArrayLength])
+        if isinstance(element_type, OpenArrayBase):
+            self.extend([POINTER(element_type.element_type), ArrayLength])
         else:
-            self.arg_types.extend([POINTER(element_type), ArrayLength])
+            self.extend([POINTER(element_type), ArrayLength])
 
-    def add_object(self, object_type):
-        self.arg_types.append(POINTER(object_type))
-
-    def __iter__(self):
-        return self.arg_types.__iter__()
+    def add_type(self, object_type):
+        self.append(POINTER(object_type))
 
 
-class NimArgs(object):
+class NimArgs(list):
     """
     Constructor for an argument list for a Nim procedure.
     """
 
-    def __init__(self):
-        self.args = []
-
     def add(self, element):
-        if isinstance(element, OpenArray):
-            return self.args.extend([element, ArrayLength(len(element))])
+        if isinstance(element, OpenArrayBase):
+            return self.extend([element, ArrayLength(len(element))])
         elif isinstance(element, Object):
-            return self.args.append(pointer(element))
+            return self.append(pointer(element))
         else:
-            return self.args.add(element)
-
-    def __iter__(self):
-        return self.args.__iter__()
+            return self.add(element)
 
 
 def NDLL(path, libname, ext="so"):
@@ -110,3 +120,8 @@ def NDLL(path, libname, ext="so"):
     filename = min(matching_names, key=lambda fn: len(fn))
 
     return CDLL(os.path.join(path, filename))
+
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()

@@ -18,16 +18,19 @@ class Object(Structure):
     pass
 
 
-class OpenArrayBase(list):
+class _OpenArrayBase(list):
     """
     A constructor for openArray arguments to Nim procedures. Realized within
     Nim as a pointer to the beginning of an array, followed by the array's
     length as an integer.
     """
 
-    def __init__(self, elements=list()):
-        if elements:
-            self.extend(elements)
+    def __init__(self, *elements):
+        super(_OpenArrayBase, self).__init__()
+
+        for element_type in elements:
+            self.append(elements)
+
 
     def array(self):
         array_type = self.element_type * len(self)
@@ -47,7 +50,9 @@ def OpenArray(element_type):
     >>> int_open_array_class = OpenArray(ctypes.c_int)
     >>> print(int_open_array_class.__name__)
     c_intOpenArray
+    >>> assert issubclass(int_open_array_class, _OpenArrayBase)
     >>> int_open_array = int_open_array_class()
+    >>> assert type(int_open_array) == int_open_array_class
     >>> int_open_array.append(1)
     >>> int_open_array.append(2)
     >>> print(int_open_array[0])
@@ -57,7 +62,7 @@ def OpenArray(element_type):
     2
     """
 
-    return type("{}OpenArray".format(element_type.__name__), (OpenArrayBase, ),
+    return type("{}OpenArray".format(element_type.__name__), (_OpenArrayBase, ),
                 {"element_type": element_type})
 
 
@@ -67,43 +72,47 @@ class NimArgTypes(list):
 
     >>> import ctypes
     >>> arg_types = NimArgTypes()
-    >>> arg_types.add_type(ctypes.c_int)
+    >>> arg_types.append(ctypes.c_int)
     >>> print(len(arg_types))
     1
     >>> print(arg_types[0].__name__)
     LP_c_int
-    >>> arg_types.add_open_array(ctypes.c_int)
-    >>> print(len(arg_types))
-    3
     >>> int_open_array_class = OpenArray(ctypes.c_int)
     >>> int_open_array = int_open_array_class()
-    >>> arg_types.add_open_array(int_open_array)
+    >>> arg_types.append(int_open_array_class)
     >>> print(len(arg_types))
-    5
+    3
     """
+    def __init__(self, *element_types):
+        super(NimArgTypes, self).__init__()
 
-    def add_open_array(self, element_type):
-        if isinstance(element_type, OpenArrayBase):
-            self.extend([POINTER(element_type.element_type), ArrayLength])
+        for element_type in element_types:
+            self.append(element_type)
+
+    def append(self, element_type):
+        if issubclass(element_type, _OpenArrayBase):
+            return self.extend([POINTER(element_type.element_type), ArrayLength])
         else:
-            self.extend([POINTER(element_type), ArrayLength])
-
-    def add_type(self, object_type):
-        self.append(POINTER(object_type))
+            return super(NimArgTypes, self).append(POINTER(element_type))
 
 
 class NimArgs(list):
     """
     Constructor for an argument list for a Nim procedure.
     """
+    def __init__(self, *elements):
+        super(NimArgs, self).__init__()
 
-    def add(self, element):
-        if isinstance(element, OpenArrayBase):
+        for element in elements:
+            self.append(element)
+
+    def append(self, element):
+        if isinstance(element, _OpenArrayBase):
             return self.extend([element, ArrayLength(len(element))])
         elif isinstance(element, Object):
-            return self.append(pointer(element))
+            return super(NimArgs, self).append(pointer(element))
         else:
-            return self.add(element)
+            return super(NimArgs, self).append(element)
 
 
 def NDLL(path, libname, ext="so"):

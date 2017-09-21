@@ -25,11 +25,12 @@ class _OpenArrayBase(list):
     length as an integer.
     """
 
-    def __init__(self, *elements):
+    def __init__(self, elements=None):
         super(_OpenArrayBase, self).__init__()
 
-        for element in elements:
-            self.append(element)
+        if elements is not None:
+            for element in elements:
+                self.append(element)
 
 
     def array(self):
@@ -76,7 +77,7 @@ class NimArgTypes(list):
     >>> print(len(arg_types))
     1
     >>> print(arg_types[0].__name__)
-    LP_c_int
+    c_int
     >>> int_open_array_class = OpenArray(ctypes.c_int)
     >>> int_open_array = int_open_array_class()
     >>> arg_types.append(int_open_array_class)

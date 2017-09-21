@@ -28,8 +28,8 @@ class _OpenArrayBase(list):
     def __init__(self, *elements):
         super(_OpenArrayBase, self).__init__()
 
-        for element_type in elements:
-            self.append(elements)
+        for element in elements:
+            self.append(element)
 
 
     def array(self):
@@ -90,10 +90,15 @@ class NimArgTypes(list):
             self.append(element_type)
 
     def append(self, element_type):
+        """
+        Append a class or c type representing a Nim type.
+        """
         if issubclass(element_type, _OpenArrayBase):
             return self.extend([POINTER(element_type.element_type), ArrayLength])
-        else:
+        elif issubclass(element_type, Object):
             return super(NimArgTypes, self).append(POINTER(element_type))
+        else:
+            return super(NimArgTypes, self).append(element_type)
 
 
 class NimArgs(list):
@@ -107,8 +112,11 @@ class NimArgs(list):
             self.append(element)
 
     def append(self, element):
+        """
+        Append an object representing a Nim openArray, object, or value.
+        """
         if isinstance(element, _OpenArrayBase):
-            return self.extend([element, ArrayLength(len(element))])
+            return self.extend([element.array(), ArrayLength(len(element))])
         elif isinstance(element, Object):
             return super(NimArgs, self).append(pointer(element))
         else:

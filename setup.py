@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name='nim-types',
-    version='0.2',
+    version='0.3',
     description='ctypes interoperability with the Nim language',
     url='https://github.com/subsetpark/ntypes',
     author='Zach Smith',

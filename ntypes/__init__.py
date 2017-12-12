@@ -12,69 +12,48 @@ n_bool = c_bool
 
 # Wrapper classes
 
-
 class Object(Structure):
     pass
 
+class OpenArrayBase(object):
+    pass
 
-class _OpenArrayBase(list):
-    """
-    A constructor for openArray arguments to Nim procedures. Realized within
-    Nim as a pointer to the beginning of an array, followed by the array's
-    length as an integer.
-    """
-
-    def __init__(self, elements=None):
-        super(_OpenArrayBase, self).__init__()
-
-        if elements is not None:
-            for element in elements:
-                self.append(element)
-
-    def array(self):
-        array_type = self.element_type * len(self)
-        array = array_type()
-
-        for i, element in enumerate(self):
-            array[i] = element
-
-        return array
-
-
-def OpenArray(element_type):
+def OpenArray(_element_type):
     """
     Declare an OpenArray type.
 
     >>> import ctypes
-    >>> int_open_array_class = OpenArray(ctypes.c_int)
-    >>> print(int_open_array_class.__name__)
+    >>> int_open_array_constructor = OpenArray(ctypes.c_int)
+    >>> print(int_open_array_constructor.__class__.__name__)
     c_intOpenArray
-    >>> issubclass(int_open_array_class, _OpenArrayBase)
+    >>> isinstance(int_open_array_constructor, OpenArrayBase)
     True
-    >>> int_open_array = int_open_array_class()
-    >>> type(int_open_array) == int_open_array_class
+    >>> int_open_array = int_open_array_constructor([1, 2])
+    >>> type(int_open_array) == ctypes.c_int * 2
     True
-    >>> int_open_array.append(1)
-    >>> int_open_array.append(2)
     >>> print(int_open_array[0])
     1
-    >>> array = int_open_array.array()
-    >>> print(len(array))
-    2
     """
-    class_name = "{}OpenArray".format(element_type.__name__)
-    attrs = {"element_type": element_type}
-    return type(class_name, (_OpenArrayBase, ), attrs)
+    class Constructor(OpenArrayBase):
+        element_type = _element_type
 
+        def __call__(self, iterable):
+            array_type = self.element_type * len(iterable)
+            array = array_type()
+
+            for i, element in enumerate(iterable):
+                array[i] = element
+            return array
+
+    Constructor.__name__ = "{}OpenArray".format(_element_type.__name__)
+    return Constructor()
 
 class NimArgs(list):
     """
     Constructor for an argument list for a Nim procedure.
 
     >>> import ctypes
-    >>> int_open_array = OpenArray(ctypes.c_int)()
-    >>> int_open_array.append(1)
-    >>> int_open_array.append(2)
+    >>> int_open_array = OpenArray(ctypes.c_int)([1, 2])
     >>> args = NimArgs(int_open_array)
     >>> len(args)
     2
@@ -101,8 +80,8 @@ class NimArgs(list):
         """
         Append an object representing a Nim openArray, object, or value.
         """
-        if isinstance(element, _OpenArrayBase):
-            return self.extend([element.array(), ArrayLength(len(element))])
+        if isinstance(element, Array):
+            return self.extend([element, ArrayLength(len(element))])
         elif isinstance(element, Object):
             return super(NimArgs, self).append(byref(element))
         else:
@@ -151,7 +130,6 @@ class NimArgTypes(list):
     >>> print(arg_types[0].__name__)
     c_int
     >>> int_open_array_class = OpenArray(ctypes.c_int)
-    >>> int_open_array = int_open_array_class()
     >>> arg_types.append(int_open_array_class)
     >>> print(len(arg_types))
     3
@@ -167,7 +145,7 @@ class NimArgTypes(list):
         """
         Append a class or c type representing a Nim type.
         """
-        if issubclass(element_type, _OpenArrayBase):
+        if isinstance(element_type, OpenArrayBase):
             return self.extend(
                 [POINTER(element_type.element_type), ArrayLength])
         elif issubclass(element_type, Object):
